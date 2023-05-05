@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:hive/hive.dart';
 
 class ListGroupsView extends StatefulWidget {
   @override
@@ -19,9 +20,11 @@ class _ListGroupsViewState extends State<ListGroupsView> {
   }
 
   Future<List<dynamic>> _filterGroups() async {
-    final response = await dio.get('http://192.168.0.111:3001/api/groups');
-    if (response.statusCode == 200) {
-      final groups = List.from(response.data);
+    final box = Hive.box('myBox'); // получаем доступ к боксу с именем 'myBox'
+    if (box.containsKey('groups')) {
+      // проверяем наличие сохраненных данных в боксе
+      final groups =
+          List.from(box.get('groups')); // получаем сохраненные данные из бокса
       if (_searchQuery.isNotEmpty) {
         return groups
             .where((group) => group['name']
@@ -32,7 +35,22 @@ class _ListGroupsViewState extends State<ListGroupsView> {
         return groups;
       }
     } else {
-      throw Exception('Failed to load groups');
+      final response = await dio.get('http://192.168.0.111:3001/api/groups');
+      if (response.statusCode == 200) {
+        final groups = List.from(response.data);
+        box.put('groups', groups); // сохраняем полученные данные в боксе
+        if (_searchQuery.isNotEmpty) {
+          return groups
+              .where((group) => group['name']
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()))
+              .toList();
+        } else {
+          return groups;
+        }
+      } else {
+        throw Exception('Failed to load groups');
+      }
     }
   }
 
